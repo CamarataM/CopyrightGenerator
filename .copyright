@@ -1,0 +1,5 @@
+source_url = https://www.example.com/software/project
+upstream_name = CopyrightGenerator
+upstream_contact_name = CamarataM
+upstream_contact_email = CamarataM@outlook.com
+thirdparty_folder_path = thirdparty

@@ -1,0 +1,11 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Source: https://www.example.com/software/project
+Upstream-Name: CopyrightGenerator
+Upstream-Contact: CamarataM <CamarataM@outlook.com>
+
+Files: 
+ ./*
+Comment: CopyrightGenerator
+Copyright: 2024 CamarataM
+License: Unlicense
+

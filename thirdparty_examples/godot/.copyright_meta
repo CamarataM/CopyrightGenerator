@@ -1,0 +1,7 @@
+name = Godot Engine
+author_year = 2014-present, Godot Engine contributors\n 2007-2014, Juan Linietsky, Ariel Manzur
+license = Expat
+
+[license_urls]
+license_url_copyright = https://raw.githubusercontent.com/godotengine/godot/master/COPYRIGHT.txt
+license_url_license = https://raw.githubusercontent.com/godotengine/godot/master/LICENSE.txt

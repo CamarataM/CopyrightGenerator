@@ -1,0 +1,36 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Source: https://www.example.com/software/project
+Upstream-Name: CopyrightGenerator
+Upstream-Contact: CamarataM <CamarataM@outlook.com>
+
+Files: 
+ thirdparty/godot/*
+Comment: Godot Engine
+Copyright: 2014-present, Godot Engine contributors
+ 2007-2014, Juan Linietsky, Ariel Manzur
+License: Expat
+
+Files: 
+ thirdparty/exproject3/*
+Comment: Example 3
+Copyright: 202X, Example 3, author_year
+License: Unlicense
+
+Files: 
+ thirdparty/exproject2/*
+Comment: Example2
+Copyright: 201X Example-2
+License: BSD-3-Clause
+
+Files: 
+ thirdparty/exproject1/*
+Comment: Example 1
+Copyright: 200X Example1
+License: MIT
+
+Files: 
+ ./*
+Comment: CopyrightGenerator
+Copyright: 2024 CamarataM
+License: Unlicense
+
