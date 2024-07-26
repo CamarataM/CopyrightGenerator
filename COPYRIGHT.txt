@@ -1,5 +1,5 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Source: https://www.example.com/software/project
+Source: https://github.com/CamarataM/CopyrightGenerator
 Upstream-Name: CopyrightGenerator
 Upstream-Contact: CamarataM <CamarataM@outlook.com>
 

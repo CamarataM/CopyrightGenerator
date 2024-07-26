@@ -1,4 +1,4 @@
-source_url = https://www.example.com/software/project
+source_url = https://github.com/CamarataM/CopyrightGenerator
 upstream_name = CopyrightGenerator
 upstream_contact_name = CamarataM
 upstream_contact_email = CamarataM@outlook.com
