@@ -85,6 +85,7 @@ class CopyrightKeys(Enum):
 	PROJECT_YEAR = "year"
 	PROJECT_AUTHOR = "author"
 	PROJECT_AUTHOR_YEAR = "author_year"
+	PROJECT_COPYRIGHT = "copyright"
 	PROJECT_LICENSE = "license"
 
 @dataclass
@@ -94,6 +95,7 @@ class CopyrightMetadataFile:
 	license: str
 	year: str | None = None
 	author_year: str | None = None
+	copyright: str | None = None
 
 	def to_config(self):
 		dataclass_dictionary = asdict(self)
@@ -205,8 +207,9 @@ def main():
 	parser.add_argument('-o', '--output', default=DEFAULT_COPYRIGHT_FILE_NAME, help="Path to the output copyright file for the entire project. Default: " + DEFAULT_COPYRIGHT_FILE_NAME)
 	parser.add_argument('-l', '--list', action='store_true', help="Whether to list the unique copyright types used in the project. Default: False")
 	parser.add_argument('--disable_npm', action='store_true', help="Whether to disable NPM checking. Default: False")
-	parser.add_argument('--disable_pip_licenses', action='store_true', help="Whether to disable pip-license checking. Default: False")
+	parser.add_argument('--disable_pip_licenses', action='store_true', help="Whether to disable pip-licenses checking. Default: False")
 	parser.add_argument('--disable_gradle', action='store_true', help="Whether to disable Gradle checking. Default: False")
+	parser.add_argument('--disable_nuget_license', action='store_true', help="Whether to disable nuget-license checking. Default: False")
 	parser.add_argument('-q', '--quiet', action='store_true', help="Whether to disable information and warning logging. Default: False")
 
 	args = parser.parse_args()
@@ -293,8 +296,8 @@ def main():
 			else:
 				LOGGER.error("Caught error running license-checker: " + str(stderr_string).strip())
 		except Exception:
-			print("Caught exception while running npx:")
-			traceback.print_exc()
+			LOGGER.error("Caught exception while running npx:")
+			LOGGER.error(traceback.format_exc())
 
 		if not ran_npx_successfully:
 			LOGGER.warning("Could not find 'license-checker'. Install using 'npm install --save-dev license-checker'.")
@@ -410,12 +413,71 @@ def main():
 						LOGGER.error("Caught error running " + str(gradlew_path) + ": " + str(stderr_string).strip())
 				except Exception:
 					LOGGER.error("Caught exception while running " + str(gradlew_path) + ": ")
-					traceback.print_exc()
+					LOGGER.error(traceback.format_exc())					
 
 				if not ran_gradle_successfully:
 					LOGGER.warning("Could not find 'Gradle-License-Report'. Install by following the instructions at 'https://github.com/jk1/Gradle-License-Report?tab=readme-ov-file#usage'. Ensure you have the 'configurations' config option set correctly for your project type (for Android: '" + 'configurations = arrayOf("ALL", "releaseRuntimeClasspath")' + "').")
 		else:
 			LOGGER.error("Unsupported platform for Gradle check: " + str(PLATFORM_SYSTEM))
+
+	# nuget-license Handler.
+	if not args.disable_nuget_license:
+		nuget_license_prefix : List[str] | None = None
+
+		if nuget_license_prefix == None and shutil.which("nuget-license") != None:
+			nuget_license_prefix = ["nuget-license"]
+
+		if nuget_license_prefix != None:
+			project_file : Path | None = None
+
+			# TODO: Which order do we want to check these in to get the best result?
+
+			# Check if any .sln file exists.
+			if project_file == None:
+				for file_path in Path.cwd().iterdir():
+					if file_path.is_file() and file_path.name.endswith(".sln"):
+						project_file = file_path
+
+			# Check if any .csproj file exists.
+			if project_file == None:
+				for file_path in Path.cwd().iterdir():
+					if file_path.is_file() and file_path.name.endswith(".csproj"):
+						project_file = file_path
+
+			if project_file != None:
+				nuget_license_parameters = ["-i", str(project_file.absolute()), "-o", "jsonPretty"]
+
+				command_list = nuget_license_prefix + nuget_license_parameters
+
+				# Attempt to use nuget-license to get licensing information.
+				process : subprocess.CompletedProcess[bytes] = subprocess.run(command_list, capture_output=True)
+
+				stdout_string = process.stdout.decode()
+				stderr_string = process.stderr.decode()
+				if len(stderr_string) == 0:
+					project_dictionary_list : List[Dict[str, str]] = json.loads(stdout_string)
+
+					for project_dictionary in project_dictionary_list:
+						project_copyright_string : str | None = None
+
+						if "Copyright" in project_dictionary:
+							project_copyright_string = ""
+
+							# TODO: More robust parsing of the line.
+							found_alpha_character = False
+							for character in project_dictionary["Copyright"].replace("Copyright", "").strip():
+								if not found_alpha_character and (character.isalpha() or character.isdigit()):
+									found_alpha_character = True
+
+								if found_alpha_character:
+									project_copyright_string += character
+
+						if "License" in project_dictionary:
+							license_meta_file_dictionary[Path(project_dictionary["PackageId"])] = CopyrightMetadataFile(name=project_dictionary["PackageId"], author=project_dictionary.get("Authors", None), license=project_dictionary["License"], copyright=project_copyright_string)
+						else:
+							LOGGER.warning("Could not find license for package '" + project_dictionary["PackageId"] + "'. Skipping.")
+				else:
+					LOGGER.error("Caught error running nuget-license: " + str(stderr_string).strip())
 
 	folder_path_list : List[Path] = []
 
@@ -514,6 +576,7 @@ def main():
 			project_year : str | None = None
 			project_author : str | None = None
 			project_author_year : str | None = None
+			project_copyright : str | None = None
 
 			if config.has_option(first_section, CopyrightKeys.PROJECT_YEAR.value):
 				project_year = config.get(first_section, CopyrightKeys.PROJECT_YEAR.value)
@@ -524,15 +587,19 @@ def main():
 			if config.has_option(first_section, CopyrightKeys.PROJECT_AUTHOR_YEAR.value):
 				project_author_year = config.get(first_section, CopyrightKeys.PROJECT_AUTHOR_YEAR.value)
 
+			if config.has_option(first_section, CopyrightKeys.PROJECT_COPYRIGHT.value):
+				project_copyright = config.get(first_section, CopyrightKeys.PROJECT_COPYRIGHT.value)
+
 			# if project_year == None and project_author_year == None:
 			# 	print("No year for project '" + project_name + "'.")
 
-			if project_author_year == None and project_author == None:
-				LOGGER.warning("No author for project '" + project_name + "'. Defaulting to project name for copyright.")
-				project_author = project_name
+			if project_copyright == None:
+				if project_author_year == None and project_author == None:
+					LOGGER.warning("No author for project '" + project_name + "'. Defaulting to project name for copyright.")
+					project_author = project_name
 
-			if project_author_year == None and project_year == None and project_author == None:
-				LOGGER.warning("No year nor author for project '" + project_name + "'. Config: " + str(meta_file.__dict__))
+				if project_author_year == None and project_year == None and project_author == None:
+					LOGGER.warning("No year nor author for project '" + project_name + "'. Config: " + str(meta_file.__dict__))
 
 			project_license = config.get(first_section, CopyrightKeys.PROJECT_LICENSE.value)
 			if unique_licenses != None:
@@ -542,10 +609,13 @@ def main():
 			write_line(" " + str(license_file_path.parent).replace('\\', PATH_SEPARATOR) + "/*")
 			write_line("Comment: " + project_name)
 
-			if project_author_year != None:
-				write_line("Copyright: " + str(project_author_year).replace('\\n', '\n'))
+			if project_copyright != None:
+				write_line(("" if project_copyright.startswith("Copyright: ") else "Copyright: ") + str(project_copyright).replace('\\n', '\n'))
 			else:
-				write_line("Copyright:" + (" " + project_year if project_year != None else "") + (" " + project_author if project_author != None else ""))
+				if project_author_year != None:
+					write_line("Copyright: " + str(project_author_year).replace('\\n', '\n'))
+				else:
+					write_line("Copyright:" + (" " + project_year if project_year != None else "") + (" " + project_author if project_author != None else ""))
 
 			write_line("License: " + project_license)
 

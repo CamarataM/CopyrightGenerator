@@ -22,6 +22,7 @@ A project contains many '**.copyright_meta**' files, one for each thirdparty pro
 - **year**: The copyright year of the thirdparty project. Is automatically formatted and combined with the **author** field. **Optional**.
 - **author**: The author of the thirdparty project. Is automatically formatted and combined with the **year** field. **Optional**.
 - **author_year**: The author and year of the thirdparty project. Is **not** automatically formatted and will be used instead of the **year** or **author** fields. **Optional**.
+- **copyright**: The full copyright string of the thirdparty project. Is **not** automatically formatted and will be used instead of the **year**, **author**, and **author_year** fields. Note: Will still prepend 'Copyright: ' to ensure matches the format DEP-5 expects. **Optional**.
 - **license**: The license of the thirdparty project. **Required**.
 
 ## Usage
