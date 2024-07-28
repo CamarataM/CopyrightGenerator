@@ -29,28 +29,39 @@ A project contains many '**.copyright_meta**' files, one for each thirdparty pro
 <!-- TODO: Test on lower Python 3 versions. The absolute minimum is 3.5 for the typing features we use, although we would have to use the old typing.Union form to get below 3.10: https://docs.python.org/3/library/typing.html#typing.Union -->
 Run 'copyright_generator.py' using a Python 3 version 3.10 or above with either the current working directory set to the root of the project containing the '**.copyright**' file or with the **-i** CLI parameter set to the path of the root of the project containing the '**.copyright**' file.
 
+<!-- PRE-USAGE-HELP -->
 ```
-$ python copyright_generator.py --help
-usage: CopyrightGenerator [-h] [-i COPYRIGHT] [-c COPYRIGHT] [-o OUTPUT] [-l] [--disable_npm] [--disable_pip_licenses]
-                          [--disable_gradle] [-q]
+usage: CopyrightGenerator [-h] [-i COPYRIGHT] [-c COPYRIGHT] [-o OUTPUT] [-l]
+                          [--disable_npm] [--disable_pip_licenses]
+                          [--disable_gradle] [--disable_nuget_license] [-q]
 
 Generates a COPYRIGHT file using the Debian copyright format.
 
 options:
   -h, --help            show this help message and exit
   -i COPYRIGHT, --input COPYRIGHT
-                        Path to the project copyright file for the current project. Default: .copyright
+                        Path to the project copyright file for the current
+                        project. Default: .copyright
   -c COPYRIGHT, --copyright COPYRIGHT
-                        Path to the project copyright file for the current project. Default: .copyright
+                        Path to the project copyright file for the current
+                        project. Default: .copyright
   -o OUTPUT, --output OUTPUT
-                        Path to the output copyright file for the entire project. Default: COPYRIGHT.txt
-  -l, --list            Whether to list the unique copyright types used in the project. Default: False
+                        Path to the output copyright file for the entire
+                        project. Default: COPYRIGHT.txt
+  -l, --list            Whether to list the unique copyright types used in the
+                        project. Default: False
   --disable_npm         Whether to disable NPM checking. Default: False
   --disable_pip_licenses
-                        Whether to disable pip-license checking. Default: False
+                        Whether to disable pip-licenses checking. Default:
+                        False
   --disable_gradle      Whether to disable Gradle checking. Default: False
-  -q, --quiet           Whether to disable information and warning logging. Default: False
+  --disable_nuget_license
+                        Whether to disable nuget-license checking. Default:
+                        False
+  -q, --quiet           Whether to disable information and warning logging.
+                        Default: False
 ```
+<!-- POST-USAGE-HELP -->
 
 ## Known Issues
 - The glob patterns for project files is imprecise and incorrect for pip-license, and Gradle (as those typically store their dependencies in external locations). This makes their glob pattern default to being every file in the project directory, which is incorrect.
