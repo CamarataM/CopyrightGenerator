@@ -36,11 +36,11 @@ readme_file_path = Path("README.md")
 
 def main():
 	readme_lines : List[str]
-	with open(readme_file_path, 'r') as input_file:
+	with open(readme_file_path, 'r', encoding='utf-8') as input_file:
 		readme_lines = input_file.readlines()
 
 	if readme_lines != None:
-		with open(readme_file_path, 'w') as output_file:
+		with open(readme_file_path, 'w', encoding='utf-8') as output_file:
 			in_usage_help = False
 			for line in readme_lines:
 				output_line : str | None = line.strip()

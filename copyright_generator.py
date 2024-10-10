@@ -122,7 +122,7 @@ def parse_copyright_meta_file(copyright_meta_file_path : Path):
 		config.read(copyright_meta_file_path)
 	except configparser.MissingSectionHeaderError:
 		# There was not a valid header in the file, so we need to append on to the file and re-parse it.
-		with open(copyright_meta_file_path, 'r') as meta_file:
+		with open(copyright_meta_file_path, 'r', encoding='utf-8') as meta_file:
 			config.read_string("[root]\n" + meta_file.read())
 
 	return config
@@ -130,7 +130,7 @@ def parse_copyright_meta_file(copyright_meta_file_path : Path):
 def parse_license_file_copyright_lines(license_file_path : Path):
 	copyright_lines : List[str] = []
 
-	with open(license_file_path, 'r') as license_file:
+	with open(license_file_path, 'r', encoding='utf-8') as license_file:
 		for line in license_file.readlines():
 			if line.strip().lower().startswith("copyright"):
 				line_split = line.split(')', 2)
@@ -190,7 +190,7 @@ def parse_project_author_year_and_project_year_from_license(license_file_path : 
 		if project_year_string == None and project_author_year_string == None:
 			# Attempt to parse project year string from license file.
 			try:
-				with open(license_file_path, 'r') as license_file:
+				with open(license_file_path, 'r', encoding='utf-8') as license_file:
 					copyright_years, all_years_valid = parse_copyright_years(license_file.read())
 
 					if len(copyright_years) > 0 and all_years_valid:
@@ -226,7 +226,7 @@ def main():
 
 	# If the '.copyright' file doesn't exist, write a default one.
 	if not project_copyright_file_path.exists():
-		with open(project_copyright_file_path, 'w') as copyright_file:
+		with open(project_copyright_file_path, 'w', encoding='utf-8') as copyright_file:
 			copyright_file.write(CopyrightKeys.SOURCE_URL.value + ' = https://www.example.com/software/project' + '\n')
 			copyright_file.write(CopyrightKeys.UPSTREAM_NAME.value + ' = SOFTware' + '\n')
 			copyright_file.write(CopyrightKeys.UPSTREAM_CONTACT_NAME.value + ' = John Doe' + '\n')
@@ -239,7 +239,7 @@ def main():
 		copyright_config.read(project_copyright_file_path)
 	except configparser.MissingSectionHeaderError:
 		# There was not a valid header in the file, so we need to prepend one to the file and re-parse it.
-		with open(project_copyright_file_path, 'r') as copyright_file:
+		with open(project_copyright_file_path, 'r', encoding='utf-8') as copyright_file:
 			copyright_config.read_string("[root]\n" + copyright_file.read())
 
 	first_section = copyright_config.sections()[0]
@@ -364,6 +364,7 @@ def main():
 								# Remove everything before site-packages if it exists.
 								license_path = Path("site-packages" + project_dictionary["LicenseFile"].split("site-packages")[-1])
 
+								# TODO: Convert license to SPDX.
 								license_meta_file_dictionary[license_path] = CopyrightMetadataFile(name=project_dictionary["Name"], author=project_dictionary.get("Author", None), license=project_dictionary["License"], year=project_year_string, author_year=project_author_year_string)
 
 							break
@@ -394,7 +395,7 @@ def main():
 					if len(stderr_string) == 0:
 						if gradle_license_report_path.exists():
 							ran_gradle_successfully = True
-							with open(gradle_license_report_path, 'r') as gradle_license_report_file:
+							with open(gradle_license_report_path, 'r', encoding='utf-8') as gradle_license_report_file:
 								dependencies_dictionary_list : Dict[str, List[Dict[str, str]]] = json.loads(gradle_license_report_file.read())
 
 								if 'dependencies' in dependencies_dictionary_list:
@@ -548,7 +549,7 @@ def main():
 	if args.list:
 		unique_licenses = set()
 
-	with open(output_copyright_file_path, 'w') as copyright_file:
+	with open(output_copyright_file_path, 'w', encoding='utf-8') as copyright_file:
 		def write_line(line : str | None = None, end : str | None = '\n'):
 			copyright_file.write((line if line != None else "") + (end if end != None else ""))
 
