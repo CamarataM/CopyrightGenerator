@@ -87,6 +87,7 @@ class CopyrightKeys(Enum):
 	PROJECT_AUTHOR_YEAR = "author_year"
 	PROJECT_COPYRIGHT = "copyright"
 	PROJECT_LICENSE = "license"
+	PROJECT_LICENSE_TEXT = "license_text"
 
 @dataclass
 class CopyrightMetadataFile:
@@ -96,9 +97,15 @@ class CopyrightMetadataFile:
 	year: str | None = None
 	author_year: str | None = None
 	copyright: str | None = None
+	license_text: str | None = None
 
 	def to_config(self):
 		dataclass_dictionary = asdict(self)
+
+		# Required to prevent configparser from throwing 'ValueError: invalid interpolation syntax'.
+		for key, value in dataclass_dictionary.items():
+			if isinstance(value, str):
+				dataclass_dictionary[key] = value.replace(r'%', r'%%')
 
 		keys_to_remove = []
 		for key, value in dataclass_dictionary.items():
@@ -206,6 +213,7 @@ def main():
 	parser.add_argument('-c', '--copyright', default=PROJECT_COPYRIGHT_FILE_NAME, help="Path to the project copyright file for the current project. Default: " + PROJECT_COPYRIGHT_FILE_NAME)
 	parser.add_argument('-o', '--output', default=DEFAULT_COPYRIGHT_FILE_NAME, help="Path to the output copyright file for the entire project. Default: " + DEFAULT_COPYRIGHT_FILE_NAME)
 	parser.add_argument('-l', '--list', action='store_true', help="Whether to list the unique copyright types used in the project. Default: False")
+	parser.add_argument('-f', '--full_output', action='store_true', help="Whether to output the license text under each entry. Default: False")
 	parser.add_argument('--disable_npm', action='store_true', help="Whether to disable NPM checking. Default: False")
 	parser.add_argument('--disable_pip_licenses', action='store_true', help="Whether to disable pip-licenses checking. Default: False")
 	parser.add_argument('--disable_gradle', action='store_true', help="Whether to disable Gradle checking. Default: False")
@@ -262,6 +270,7 @@ def main():
 	# NPM and Node.js Handler.
 	# TODO: Detect other frameworks other than Node.js.
 	# TODO: Detect and ignore TypeScript type modules.
+	# TODO: Implement license_text
 	if not args.disable_npm and shutil.which("npm") != None and Path(Path.cwd(), "package.json").exists():
 		ran_npx_successfully = False
 
@@ -365,13 +374,14 @@ def main():
 								license_path = Path("site-packages" + project_dictionary["LicenseFile"].split("site-packages")[-1])
 
 								# TODO: Convert license to SPDX.
-								license_meta_file_dictionary[license_path] = CopyrightMetadataFile(name=project_dictionary["Name"], author=project_dictionary.get("Author", None), license=project_dictionary["License"], year=project_year_string, author_year=project_author_year_string)
+								license_meta_file_dictionary[license_path] = CopyrightMetadataFile(name=project_dictionary["Name"], author=project_dictionary.get("Author", None), license=project_dictionary["License"], year=project_year_string, author_year=project_author_year_string, license_text=project_dictionary.get("LicenseText", None))
 
 							break
 						else:
 							LOGGER.error("Caught error running pip-licenses: " + str(stderr_string).strip())
 
 	# Gradle Handler.
+	# TODO: Implement license_text
 	if not args.disable_gradle:
 		gradlew_path : Path | None = None
 		if PLATFORM_SYSTEM == "Windows":
@@ -422,6 +432,7 @@ def main():
 			LOGGER.error("Unsupported platform for Gradle check: " + str(PLATFORM_SYSTEM))
 
 	# nuget-license Handler.
+	# TODO: Implement license_text
 	if not args.disable_nuget_license:
 		nuget_license_prefix : List[str] | None = None
 
@@ -525,6 +536,7 @@ def main():
 							file_name = Path(url).name
 
 						# Download the file to the current thirdparty folder.
+						# TODO: Legacy interface, should be replaced.
 						urllib.request.urlretrieve(url, Path(thirdparty_project_folder_path, file_name))
 
 			license_file_path : Path | None = None
@@ -578,6 +590,7 @@ def main():
 			project_author : str | None = None
 			project_author_year : str | None = None
 			project_copyright : str | None = None
+			project_license_text : str | None = None
 
 			if config.has_option(first_section, CopyrightKeys.PROJECT_YEAR.value):
 				project_year = config.get(first_section, CopyrightKeys.PROJECT_YEAR.value)
@@ -591,8 +604,8 @@ def main():
 			if config.has_option(first_section, CopyrightKeys.PROJECT_COPYRIGHT.value):
 				project_copyright = config.get(first_section, CopyrightKeys.PROJECT_COPYRIGHT.value)
 
-			# if project_year == None and project_author_year == None:
-			# 	print("No year for project '" + project_name + "'.")
+			if config.has_option(first_section, CopyrightKeys.PROJECT_LICENSE_TEXT.value):
+				project_license_text = config.get(first_section, CopyrightKeys.PROJECT_LICENSE_TEXT.value)
 
 			if project_copyright == None:
 				if project_author_year == None and project_author == None:
@@ -601,6 +614,10 @@ def main():
 
 				if project_author_year == None and project_year == None and project_author == None:
 					LOGGER.warning("No year nor author for project '" + project_name + "'. Config: " + str(meta_file.__dict__))
+
+			if license_file_path.exists() and project_license_text == None:
+				with open(license_file_path, 'r', encoding='utf-8') as license_file:
+					project_license_text = license_file.read()
 
 			project_license = config.get(first_section, CopyrightKeys.PROJECT_LICENSE.value)
 			if unique_licenses != None:
@@ -619,6 +636,13 @@ def main():
 					write_line("Copyright:" + (" " + project_year if project_year != None else "") + (" " + project_author if project_author != None else ""))
 
 			write_line("License: " + project_license)
+
+			if args.full_output:
+				if project_license_text != None:
+					for line in project_license_text.splitlines():
+						write_line(" " + line)
+				else:
+					LOGGER.warning("Could not get license text for project '" + project_name + "'.")
 
 			write_line()
 
