@@ -122,6 +122,8 @@ class CopyrightMetadataFile:
 
 		return return_config
 
+# TODO: Create class for the project copyright file meta.
+
 def parse_copyright_meta_file(copyright_meta_file_path : Path):
 	config = configparser.ConfigParser()
 
@@ -207,6 +209,19 @@ def parse_project_author_year_and_project_year_from_license(license_file_path : 
 
 	return (project_author_year_string, project_year_string)
 
+def create_example_project_copyright_file(path : Path):
+	if path.parent.exists():
+		with open(path, 'w', encoding='utf-8') as copyright_file:
+			copyright_file.write(CopyrightKeys.SOURCE_URL.value + ' = https://www.example.com/software/project' + '\n')
+			copyright_file.write(CopyrightKeys.UPSTREAM_NAME.value + ' = SOFTware' + '\n')
+			copyright_file.write(CopyrightKeys.UPSTREAM_CONTACT_NAME.value + ' = John Doe' + '\n')
+			copyright_file.write(CopyrightKeys.UPSTREAM_CONTACT_EMAIL.value + ' = john.doe@example.com' + '\n')
+			copyright_file.write(CopyrightKeys.THIRDPARTY_FOLDER_PATH.value + ' = thirdparty' + '\n')
+
+		return True
+	else:
+		return False
+
 def main():
 	parser = argparse.ArgumentParser(prog='CopyrightGenerator', description='Generates a COPYRIGHT file using the Debian copyright format.')
 	parser.add_argument('-i', '--input', dest="copyright", default=PROJECT_COPYRIGHT_FILE_NAME, help="Path to the project copyright file for the current project. Default: " + PROJECT_COPYRIGHT_FILE_NAME)
@@ -214,11 +229,13 @@ def main():
 	parser.add_argument('-o', '--output', default=DEFAULT_COPYRIGHT_FILE_NAME, help="Path to the output copyright file for the entire project. Default: " + DEFAULT_COPYRIGHT_FILE_NAME)
 	parser.add_argument('-l', '--list', action='store_true', help="Whether to list the unique copyright types used in the project. Default: False")
 	parser.add_argument('-f', '--full_output', action='store_true', help="Whether to output the license text under each entry. Default: False")
+	parser.add_argument('-q', '--quiet', action='store_true', help="Whether to disable information and warning logging. Default: False")
+	parser.add_argument('-m', '--make_metadata_file', action='store_true', help="Whether to create an example metadata copyright file in the current directory. Default: False")
+	parser.add_argument('-r', '--make_copyright_file', action='store_true', help="Whether to create an example project copyright file in the current directory. Default: False")
 	parser.add_argument('--disable_npm', action='store_true', help="Whether to disable NPM checking. Default: False")
 	parser.add_argument('--disable_pip_licenses', action='store_true', help="Whether to disable pip-licenses checking. Default: False")
 	parser.add_argument('--disable_gradle', action='store_true', help="Whether to disable Gradle checking. Default: False")
 	parser.add_argument('--disable_nuget_license', action='store_true', help="Whether to disable nuget-license checking. Default: False")
-	parser.add_argument('-q', '--quiet', action='store_true', help="Whether to disable information and warning logging. Default: False")
 
 	args = parser.parse_args()
 
@@ -229,17 +246,42 @@ def main():
 
 		LOGGER.addFilter(QuietFilter())
 
+	if args.make_metadata_file:
+		metadata_file_path = Path(Path.cwd(), METADATA_FILE_NAME)
+
+		if not metadata_file_path.exists():
+			LOGGER.info("Creating example metadata file at '" + str(metadata_file_path) + "'.")
+
+			with open(metadata_file_path, 'w', encoding='utf-8') as metadata_file:
+				copyright_metadata_file = CopyrightMetadataFile(name="Example Project Name", author="Example Author Name", license="SPDX License Code", year="Year of Copyright String")
+				copyright_metadata_file.to_config().write(metadata_file)
+
+			return 0
+		else:
+			LOGGER.error("Metadata file already exists at '" + str(metadata_file_path) + "'.")
+			return 1
+
+	if args.make_copyright_file:
+		copyright_file_path = Path(Path.cwd(), PROJECT_COPYRIGHT_FILE_NAME)
+
+		if not copyright_file_path.exists():
+			LOGGER.info("Creating example project copyright file at '" + str(copyright_file_path) + "'.")
+
+			if not create_example_project_copyright_file(copyright_file_path):
+				LOGGER.error("Got error on creation of project copyright file.")
+				return 1
+
+			return 0
+		else:
+			LOGGER.error("Project copyright file already exists at '" + str(copyright_file_path) + "'.")
+			return 1
+
 	project_copyright_file_path = Path(args.copyright)
 	output_copyright_file_path = Path(args.output)
 
 	# If the '.copyright' file doesn't exist, write a default one.
 	if not project_copyright_file_path.exists():
-		with open(project_copyright_file_path, 'w', encoding='utf-8') as copyright_file:
-			copyright_file.write(CopyrightKeys.SOURCE_URL.value + ' = https://www.example.com/software/project' + '\n')
-			copyright_file.write(CopyrightKeys.UPSTREAM_NAME.value + ' = SOFTware' + '\n')
-			copyright_file.write(CopyrightKeys.UPSTREAM_CONTACT_NAME.value + ' = John Doe' + '\n')
-			copyright_file.write(CopyrightKeys.UPSTREAM_CONTACT_EMAIL.value + ' = john.doe@example.com' + '\n')
-			copyright_file.write(CopyrightKeys.THIRDPARTY_FOLDER_PATH.value + ' = thirdparty' + '\n')
+		create_example_project_copyright_file(project_copyright_file_path)
 
 	# Attempt to parse the '.copyright' file.
 	copyright_config = configparser.ConfigParser()
