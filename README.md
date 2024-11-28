@@ -31,9 +31,10 @@ Run 'copyright_generator.py' using a Python 3 version 3.10 or above with either 
 
 <!-- PRE-USAGE-HELP -->
 ```
-usage: CopyrightGenerator [-h] [-i COPYRIGHT] [-c COPYRIGHT] [-o OUTPUT] [-l]
+usage: CopyrightGenerator [-h] [-i COPYRIGHT] [-c COPYRIGHT] [-o OUTPUT]
+                          [-j JSON_OUTPUT] [-l] [-f] [-q] [-m] [-r]
                           [--disable_npm] [--disable_pip_licenses]
-                          [--disable_gradle] [--disable_nuget_license] [-q]
+                          [--disable_gradle] [--disable_nuget_license]
 
 Generates a COPYRIGHT file using the Debian copyright format.
 
@@ -48,8 +49,21 @@ options:
   -o OUTPUT, --output OUTPUT
                         Path to the output copyright file for the entire
                         project. Default: COPYRIGHT.txt
+  -j JSON_OUTPUT, --json_output JSON_OUTPUT
+                        Path to the output json copyright file for the entire
+                        project. Default: None
   -l, --list            Whether to list the unique copyright types used in the
                         project. Default: False
+  -f, --full_output     Whether to output the license text under each entry.
+                        Default: False
+  -q, --quiet           Whether to disable information and warning logging.
+                        Default: False
+  -m, --make_metadata_file
+                        Whether to create an example metadata copyright file
+                        in the current directory. Default: False
+  -r, --make_copyright_file
+                        Whether to create an example project copyright file in
+                        the current directory. Default: False
   --disable_npm         Whether to disable NPM checking. Default: False
   --disable_pip_licenses
                         Whether to disable pip-licenses checking. Default:
@@ -58,8 +72,6 @@ options:
   --disable_nuget_license
                         Whether to disable nuget-license checking. Default:
                         False
-  -q, --quiet           Whether to disable information and warning logging.
-                        Default: False
 ```
 <!-- POST-USAGE-HELP -->
 
