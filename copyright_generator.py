@@ -57,6 +57,7 @@ PATH_SEPARATOR = '/'
 PROJECT_COPYRIGHT_FILE_NAME = ".copyright"
 METADATA_FILE_NAME = ".copyright_meta"
 DEFAULT_COPYRIGHT_FILE_NAME = "COPYRIGHT.txt"
+DEFAULT_COPYRIGHT_JSON_FILE_NAME = None
 
 LICENSE_URLS_SECTION_NAME = "license_urls"
 
@@ -227,6 +228,7 @@ def main():
 	parser.add_argument('-i', '--input', dest="copyright", default=PROJECT_COPYRIGHT_FILE_NAME, help="Path to the project copyright file for the current project. Default: " + PROJECT_COPYRIGHT_FILE_NAME)
 	parser.add_argument('-c', '--copyright', default=PROJECT_COPYRIGHT_FILE_NAME, help="Path to the project copyright file for the current project. Default: " + PROJECT_COPYRIGHT_FILE_NAME)
 	parser.add_argument('-o', '--output', default=DEFAULT_COPYRIGHT_FILE_NAME, help="Path to the output copyright file for the entire project. Default: " + DEFAULT_COPYRIGHT_FILE_NAME)
+	parser.add_argument('-j', '--json_output', default=DEFAULT_COPYRIGHT_JSON_FILE_NAME, help="Path to the output json copyright file for the entire project. Default: " + str(DEFAULT_COPYRIGHT_JSON_FILE_NAME))
 	parser.add_argument('-l', '--list', action='store_true', help="Whether to list the unique copyright types used in the project. Default: False")
 	parser.add_argument('-f', '--full_output', action='store_true', help="Whether to output the license text under each entry. Default: False")
 	parser.add_argument('-q', '--quiet', action='store_true', help="Whether to disable information and warning logging. Default: False")
@@ -278,6 +280,7 @@ def main():
 
 	project_copyright_file_path = Path(args.copyright)
 	output_copyright_file_path = Path(args.output)
+	json_output_copyright_file_path = Path(args.json_output) if args.json_output != None else None
 
 	# If the '.copyright' file doesn't exist, write a default one.
 	if not project_copyright_file_path.exists():
@@ -414,6 +417,9 @@ def main():
 
 								# Remove everything before site-packages if it exists.
 								license_path = Path("site-packages" + project_dictionary["LicenseFile"].split("site-packages")[-1])
+
+								# TODO: License can actually be incorrect for packages such as https://github.com/thatmattlove/favicons, where pip-license is picking it up from...somewhere? The license for this package is "BSD-3-Clause-Clear" in the pyproject.toml, so not sure where it is picking up "Other/Proprietary License" instead. It metadata, the 'Classifier: License' is set to "Other/Proprietary License", but "License" is still set correctly.
+								# TODO: This is actually related to this PR, which added license-classifier support https://github.com/raimon49/pip-licenses/pull/132. Running with the '--meta=from' will grab the correct license for favicons, but will fail for many other things (flask, etc.) and is typically less precise and more human-readable rather than the SPDX codes. This is more of a problem that the package is mis-configured, and the potential fallout of this is minor, but it is still annoying and producing potentially incorrect results. Could potentially compare meta vs non-meta copyright values, but seems error-prone. An override system would likely be better anyways.
 
 								# TODO: Convert license to SPDX.
 								license_meta_file_dictionary[license_path] = CopyrightMetadataFile(name=project_dictionary["Name"], author=project_dictionary.get("Author", None), license=project_dictionary["License"], year=project_year_string, author_year=project_author_year_string, license_text=project_dictionary.get("LicenseText", None))
@@ -602,91 +608,116 @@ def main():
 	unique_licenses : Set[str] | None = None
 	if args.list:
 		unique_licenses = set()
+	
+	output_path_list : List[Path] = [output_copyright_file_path]
+	if json_output_copyright_file_path != None:
+		output_path_list.append(json_output_copyright_file_path)
 
-	with open(output_copyright_file_path, 'w', encoding='utf-8') as copyright_file:
-		def write_line(line : str | None = None, end : str | None = '\n'):
-			copyright_file.write((line if line != None else "") + (end if end != None else ""))
+	for output_path in output_path_list:
+		is_copyright_file = output_path == output_copyright_file_path
+		is_json_file = output_path == json_output_copyright_file_path
 
-		# Header ( https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/#:~:text=5.1.1.%20example%20header%20stanza )
-		write_line("Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/")
-		write_line("Source: " + source_url)
-		write_line("Upstream-Name: " + upstream_name)
-		write_line("Upstream-Contact: " + upstream_contact_name + " <" + upstream_contact_email + ">")
+		output_project_dictionary_list : List[Dict[str, str]] = [] if is_json_file else None
+		with open(output_path, 'w', encoding='utf-8') as copyright_file:
+			def write_line(line : str | None = None, end : str | None = '\n'):
+				copyright_file.write((line if line != None else "") + (end if end != None else ""))
 
-		write_line()
+			if is_copyright_file:
+				# Header ( https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/#:~:text=5.1.1.%20example%20header%20stanza )
+				write_line("Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/")
+				write_line("Source: " + source_url)
+				write_line("Upstream-Name: " + upstream_name)
+				write_line("Upstream-Contact: " + upstream_contact_name + " <" + upstream_contact_email + ">")
 
-		for license_file_path, meta_file in license_meta_file_dictionary.items():
-			if isinstance(meta_file, Path):
-				config = parse_copyright_meta_file(copyright_meta_file_path=meta_file)
-			elif isinstance(meta_file, CopyrightMetadataFile):
-				config = meta_file.to_config()
-			else:
-				LOGGER.warning("Invalid meta_file for license file path '" + str(license_file_path) + "': " + str(meta_file) + "'.")
-				continue
+				write_line()
 
-			first_section = config.sections()[0]
-
-			project_name = config.get(first_section, CopyrightKeys.PROJECT_NAME.value)
-
-			project_year : str | None = None
-			project_author : str | None = None
-			project_author_year : str | None = None
-			project_copyright : str | None = None
-			project_license_text : str | None = None
-
-			if config.has_option(first_section, CopyrightKeys.PROJECT_YEAR.value):
-				project_year = config.get(first_section, CopyrightKeys.PROJECT_YEAR.value)
-
-			if config.has_option(first_section, CopyrightKeys.PROJECT_AUTHOR.value):
-				project_author = config.get(first_section, CopyrightKeys.PROJECT_AUTHOR.value)
-
-			if config.has_option(first_section, CopyrightKeys.PROJECT_AUTHOR_YEAR.value):
-				project_author_year = config.get(first_section, CopyrightKeys.PROJECT_AUTHOR_YEAR.value)
-
-			if config.has_option(first_section, CopyrightKeys.PROJECT_COPYRIGHT.value):
-				project_copyright = config.get(first_section, CopyrightKeys.PROJECT_COPYRIGHT.value)
-
-			if config.has_option(first_section, CopyrightKeys.PROJECT_LICENSE_TEXT.value):
-				project_license_text = config.get(first_section, CopyrightKeys.PROJECT_LICENSE_TEXT.value)
-
-			if project_copyright == None:
-				if project_author_year == None and project_author == None:
-					LOGGER.warning("No author for project '" + project_name + "'. Defaulting to project name for copyright.")
-					project_author = project_name
-
-				if project_author_year == None and project_year == None and project_author == None:
-					LOGGER.warning("No year nor author for project '" + project_name + "'. Config: " + str(meta_file.__dict__))
-
-			if license_file_path.exists() and project_license_text == None:
-				with open(license_file_path, 'r', encoding='utf-8') as license_file:
-					project_license_text = license_file.read()
-
-			project_license = config.get(first_section, CopyrightKeys.PROJECT_LICENSE.value)
-			if unique_licenses != None:
-				unique_licenses.add(project_license)
-
-			write_line("Files: ")
-			write_line(" " + str(license_file_path.parent).replace('\\', PATH_SEPARATOR) + "/*")
-			write_line("Comment: " + project_name)
-
-			if project_copyright != None:
-				write_line(("" if project_copyright.startswith("Copyright: ") else "Copyright: ") + str(project_copyright).replace('\\n', '\n'))
-			else:
-				if project_author_year != None:
-					write_line("Copyright: " + str(project_author_year).replace('\\n', '\n'))
+			for license_file_path, meta_file in license_meta_file_dictionary.items():
+				if isinstance(meta_file, Path):
+					config = parse_copyright_meta_file(copyright_meta_file_path=meta_file)
+				elif isinstance(meta_file, CopyrightMetadataFile):
+					config = meta_file.to_config()
 				else:
-					write_line("Copyright:" + (" " + project_year if project_year != None else "") + (" " + project_author if project_author != None else ""))
+					LOGGER.warning("Invalid meta_file for license file path '" + str(license_file_path) + "': " + str(meta_file) + "'.")
+					continue
 
-			write_line("License: " + project_license)
+				first_section = config.sections()[0]
 
-			if args.full_output:
-				if project_license_text != None:
-					for line in project_license_text.splitlines():
-						write_line(" " + line)
-				else:
-					LOGGER.warning("Could not get license text for project '" + project_name + "'.")
+				project_name = config.get(first_section, CopyrightKeys.PROJECT_NAME.value)
 
-			write_line()
+				project_year : str | None = None
+				project_author : str | None = None
+				project_author_year : str | None = None
+				project_copyright : str | None = None
+				project_license_text : str | None = None
+				project_license : str | None = None
+
+				if config.has_option(first_section, CopyrightKeys.PROJECT_YEAR.value):
+					project_year = config.get(first_section, CopyrightKeys.PROJECT_YEAR.value)
+
+				if config.has_option(first_section, CopyrightKeys.PROJECT_AUTHOR.value):
+					project_author = config.get(first_section, CopyrightKeys.PROJECT_AUTHOR.value)
+
+				if config.has_option(first_section, CopyrightKeys.PROJECT_AUTHOR_YEAR.value):
+					project_author_year = config.get(first_section, CopyrightKeys.PROJECT_AUTHOR_YEAR.value)
+
+				if config.has_option(first_section, CopyrightKeys.PROJECT_COPYRIGHT.value):
+					project_copyright = config.get(first_section, CopyrightKeys.PROJECT_COPYRIGHT.value)
+
+				if config.has_option(first_section, CopyrightKeys.PROJECT_LICENSE_TEXT.value):
+					project_license_text = config.get(first_section, CopyrightKeys.PROJECT_LICENSE_TEXT.value)
+
+				if project_copyright == None:
+					if project_author_year == None and project_author == None:
+						LOGGER.warning("No author for project '" + project_name + "'. Defaulting to project name for copyright.")
+						project_author = project_name
+
+					if project_author_year == None and project_year == None and project_author == None:
+						LOGGER.warning("No year nor author for project '" + project_name + "'. Config: " + str(meta_file.__dict__))
+
+				if license_file_path.exists() and project_license_text == None:
+					with open(license_file_path, 'r', encoding='utf-8') as license_file:
+						project_license_text = license_file.read()
+
+				project_license = config.get(first_section, CopyrightKeys.PROJECT_LICENSE.value)
+				if unique_licenses != None:
+					unique_licenses.add(project_license)
+
+				if is_copyright_file:
+					write_line("Files: ")
+					write_line(" " + str(license_file_path.parent).replace('\\', PATH_SEPARATOR) + "/*")
+					write_line("Comment: " + project_name)
+
+					if project_copyright != None:
+						write_line(("" if project_copyright.startswith("Copyright: ") else "Copyright: ") + str(project_copyright).replace('\\n', '\n'))
+					else:
+						if project_author_year != None:
+							write_line("Copyright: " + str(project_author_year).replace('\\n', '\n'))
+						else:
+							write_line("Copyright:" + (" " + project_year if project_year != None else "") + (" " + project_author if project_author != None else ""))
+
+					write_line("License: " + project_license)
+
+					if args.full_output:
+						if project_license_text != None:
+							for line in project_license_text.splitlines():
+								write_line(" " + line)
+						else:
+							LOGGER.warning("Could not get license text for project '" + project_name + "'.")
+
+					write_line()
+				elif is_json_file:
+					output_project_dictionary_list.append({
+						CopyrightKeys.PROJECT_NAME.value: project_name,
+						CopyrightKeys.PROJECT_YEAR.value: project_year,
+						CopyrightKeys.PROJECT_AUTHOR.value: project_author,
+						CopyrightKeys.PROJECT_AUTHOR_YEAR.value: project_author_year,
+						CopyrightKeys.PROJECT_COPYRIGHT.value: project_copyright,
+						CopyrightKeys.PROJECT_LICENSE_TEXT.value: project_license_text,
+						CopyrightKeys.PROJECT_LICENSE.value: project_license,
+					})
+	
+			if is_json_file:
+				write_line(json.dumps(output_project_dictionary_list, indent='\t'))
 
 	# Remove all filters for any final outputs.
 	for filter in LOGGER.filters:
