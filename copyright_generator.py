@@ -358,11 +358,14 @@ def main():
 
 	# pip-licenses Handler.
 	if not args.disable_pip_licenses:
-		pipenv_prefix : List[str] = []
+		package_manager_prefix : List[str] = []
 		python_prefix : List[str] | None = None
 
 		if python_prefix == None and shutil.which("pipenv") != None and Path(Path.cwd(), "Pipfile").exists():
-			pipenv_prefix = ["pipenv", "run"]
+			package_manager_prefix = ["pipenv", "run"]
+
+		if python_prefix == None and shutil.which("poetry") != None and Path(Path.cwd(), "poetry.lock").exists():
+			package_manager_prefix = ["poetry", "run"]
 
 		if python_prefix == None and shutil.which("python") != None:
 			python_prefix = ["python"]
@@ -376,8 +379,11 @@ def main():
 			# Check if requirements.txt exists.
 			if not is_python_project:
 				for file_path in Path.cwd().iterdir():
-					if file_path.is_file() and file_path.name.startswith("requirements"):
-						is_python_project = True
+					if file_path.is_file():
+						if file_path.name.startswith("requirements"):
+							is_python_project = True
+						elif file_path.name == "pyproject.toml":
+							is_python_project = True
 
 			# Check if any Python files exist (WARNING: Least reliable).
 			if not is_python_project:
@@ -392,9 +398,9 @@ def main():
 
 				for command_list in [
 					# Attempt to run the pip-licenses bin using the current Pipenv.
-					pipenv_prefix + ["pip-licenses"] + pip_license_parameters if len(pipenv_prefix) > 0 else None,
+					package_manager_prefix + ["pip-licenses"] + pip_license_parameters if len(package_manager_prefix) > 0 else None,
 					# Attempt to run the module using the Python version from Pipenv.
-					pipenv_prefix + python_prefix + ["-m", "pip-licenses"] + pip_license_parameters,
+					package_manager_prefix + python_prefix + ["-m", "pip-licenses"] + pip_license_parameters,
 				]:
 					if ran_pip_licenses_successfully:
 						break
