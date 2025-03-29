@@ -320,35 +320,55 @@ def main():
 		ran_npx_successfully = False
 
 		try:
-			process : subprocess.CompletedProcess[bytes] = subprocess.run(["npm", "exec", "--no", "--", "license-checker", "--json"], capture_output=True)
+			npm_path_arguments : List[str] = None
+			if PLATFORM_SYSTEM == "Windows":
+				npm_path_arguments = ["npm.cmd"]
+			elif PLATFORM_SYSTEM in ["Linux", "Darwin"]:
+				npm_path_arguments = ["npm"]
 
-			stdout_string = process.stdout.decode()
-			stderr_string = process.stderr.decode()
-			if len(stderr_string) == 0:
-				license_checker_output_json : Dict[str, Dict[str, str]] = json.loads(stdout_string)
+			if npm_path_arguments != None:
+				# process : subprocess.CompletedProcess[bytes] = subprocess.run(["npm", "exec", "--no", "--", "license-checker", "--json"], capture_output=True)
+				process : subprocess.CompletedProcess[bytes] = subprocess.run(npm_path_arguments + ["exec", "--no", "--", "license-checker", "--json"], capture_output=True)
 
-				for project_namespace, project_dictionary in license_checker_output_json.items():
-					if "licenses" in project_dictionary:
-						project_author_year_string : str | None = None
-						project_year_string : str | None = None
+				stdout_string = process.stdout.decode()
+				stderr_string = process.stderr.decode()
+				if len(stderr_string) == 0:
+					license_checker_output_json : Dict[str, Dict[str, str]] = json.loads(stdout_string)
 
-						if "licenseFile" in project_dictionary:
-							project_author_year_string, project_year_string = parse_project_author_year_and_project_year_from_license(project_dictionary["licenseFile"])
+					for project_namespace, project_dictionary in license_checker_output_json.items():
+						if "licenses" in project_dictionary:
+							project_author_year_string : str | None = None
+							project_year_string : str | None = None
+							project_license_text : str | None = None
 
-						project_folder_absolute_path_string = project_dictionary["path"]
-						project_folder_relative_path_string = project_folder_absolute_path_string.removeprefix(str(Path.cwd()))
+							if "licenseFile" in project_dictionary:
+								license_file_path_string = project_dictionary["licenseFile"]
 
-						# Remove any leading file separators.
-						while project_folder_relative_path_string.startswith('/') or project_folder_relative_path_string.startswith('\\'):
-							project_folder_relative_path_string = project_folder_relative_path_string[1:]
+								project_author_year_string, project_year_string = parse_project_author_year_and_project_year_from_license(license_file_path_string)
 
-						license_meta_file_dictionary[Path(project_folder_relative_path_string)] = CopyrightMetadataFile(name=project_namespace, author=project_dictionary.get("publisher", None), license=project_dictionary["licenses"], year=project_year_string, author_year=project_author_year_string)
-					else:
-						LOGGER.warning("Project '" + str(project_namespace) + "' missing license in dictionary '" + str(project_dictionary) + "'")
+								# Attempt to read license text from file.
+								license_file_path = Path(license_file_path_string)
+								if license_file_path.exists() and license_file_path.is_file():
+									with open(license_file_path, 'r', encoding='utf-8') as license_file:
+										project_license_text = license_file.read()
 
-				ran_npx_successfully = True
+							project_folder_absolute_path_string = project_dictionary["path"]
+							project_folder_relative_path_string = project_folder_absolute_path_string.removeprefix(str(Path.cwd()))
+
+							# Remove any leading file separators.
+							while project_folder_relative_path_string.startswith('/') or project_folder_relative_path_string.startswith('\\'):
+								project_folder_relative_path_string = project_folder_relative_path_string[1:]
+
+							# Insert a generic (non-existing) file-path to the license file, as we do not need to read the license from the file since we try that from this parser.
+							license_meta_file_dictionary[Path(project_folder_relative_path_string, ('<LICENSE' + datetime.datetime.now().isoformat() + '>'))] = CopyrightMetadataFile(name=project_namespace, author=project_dictionary.get("publisher", None), license=project_dictionary["licenses"], year=project_year_string, author_year=project_author_year_string, license_text=project_license_text)
+						else:
+							LOGGER.warning("Project '" + str(project_namespace) + "' missing license in dictionary '" + str(project_dictionary) + "'")
+
+					ran_npx_successfully = True
+				else:
+					LOGGER.error("Caught error running license-checker: " + str(stderr_string).strip())
 			else:
-				LOGGER.error("Caught error running license-checker: " + str(stderr_string).strip())
+				LOGGER.warning("Got invalid NPM path for platform '" + str(PLATFORM_SYSTEM) + "'.")
 		except Exception:
 			LOGGER.error("Caught exception while running npx:")
 			LOGGER.error(traceback.format_exc())
@@ -680,7 +700,7 @@ def main():
 					if project_author_year == None and project_year == None and project_author == None:
 						LOGGER.warning("No year nor author for project '" + project_name + "'. Config: " + str(meta_file.__dict__))
 
-				if license_file_path.exists() and project_license_text == None:
+				if license_file_path.exists() and license_file_path.is_file() and project_license_text == None:
 					with open(license_file_path, 'r', encoding='utf-8') as license_file:
 						project_license_text = license_file.read()
 
